@@ -650,17 +650,28 @@ try{
   db=firebase.database(app);
   db.ref("wedding").on("value",snap=>{
     const d=snap.val();
-    if(d){S.tasks=d.tasks||DEFAULT_TASKS;S.guests=d.guests?(Array.isArray(d.guests)?d.guests:Object.values(d.guests)):[];S.budget=d.budget||{nikah:[],mehendi:[],walima:[]};S.vendors=d.vendors?(Array.isArray(d.vendors)?d.vendors:Object.values(d.vendors)):DEFAULT_VENDORS;S.locations=d.locations?(Array.isArray(d.locations)?d.locations:Object.values(d.locations)):DEFAULT_LOCATIONS;S.moodboard=d.moodboard?(Array.isArray(d.moodboard)?d.moodboard:Object.values(d.moodboard)):DEFAULT_MB;S.activity=d.activity?(Array.isArray(d.activity)?d.activity:Object.values(d.activity)):[];S.dates=d.dates||S.dates;}
+    if(d){const gRaw=d.guests?(Array.isArray(d.guests)?d.guests:Object.values(d.guests)):[];S.tasks=d.tasks||DEFAULT_TASKS;S.guests=gRaw.length?gRaw:S.guests;S.budget=d.budget||{nikah:[],mehendi:[],walima:[]};S.vendors=d.vendors?(Array.isArray(d.vendors)?d.vendors:Object.values(d.vendors)):DEFAULT_VENDORS;S.locations=d.locations?(Array.isArray(d.locations)?d.locations:Object.values(d.locations)):DEFAULT_LOCATIONS;S.moodboard=d.moodboard?(Array.isArray(d.moodboard)?d.moodboard:Object.values(d.moodboard)):DEFAULT_MB;S.activity=d.activity?(Array.isArray(d.activity)?d.activity:Object.values(d.activity)):[];S.dates=d.dates||S.dates;}
     else push();
     renderAll();
     document.getElementById("fbdot").classList.add("live");
     document.getElementById("fblabel").textContent="Live sync ✓";
     showSync("connected","🔥 Firebase connected!");
   });
-  db.ref(".info/connected").on("value",snap=>{if(!snap.val()){document.getElementById("fbdot").classList.remove("live");document.getElementById("fblabel").textContent="Offline";showSync("offline","⚠ Offline");}});
+  db.ref(".info/connected").on("value",snap=>{
+    if(snap.val()){
+      document.getElementById("fbdot").classList.add("live");
+      document.getElementById("fblabel").textContent="Live sync ✓";
+      clearTimeout(window._offlineTimer);
+    } else {
+      document.getElementById("fbdot").classList.remove("live");
+      document.getElementById("fblabel").textContent="Connecting...";
+      clearTimeout(window._offlineTimer);
+      window._offlineTimer=setTimeout(()=>{document.getElementById("fblabel").textContent="Offline";showSync("offline","⚠ Offline — changes saved locally");},4000);
+    }
+  });
 }catch(e){console.warn(e);document.getElementById("fblabel").textContent="Offline mode";renderAll();}
 
-function push(){localStorage.setItem("za_data",JSON.stringify(S));if(!db){showSync("synced","✓ Saved locally");return;}showSync("syncing","⏳ Syncing...");db.ref("wedding").set({tasks:S.tasks,guests:S.guests,budget:S.budget,vendors:S.vendors,locations:S.locations,moodboard:S.moodboard,activity:S.activity,dates:S.dates}).then(()=>showSync("synced","✓ Saved & synced"));}
+function push(){localStorage.setItem("za_data",JSON.stringify(S));if(!db){showSync("synced","✓ Saved locally");return;}showSync("syncing","⏳ Syncing...");db.ref("wedding").set({tasks:S.tasks,guests:S.guests,budget:S.budget,vendors:S.vendors,locations:S.locations,moodboard:S.moodboard,activity:S.activity,dates:S.dates}).then(()=>showSync("synced","✓ Saved & synced")).catch(err=>{showSync("offline","✗ Sync failed — saved locally");console.error("Firebase write error:",err);});}
 function logActivity(action,section,detail){const who=viewingAs==="all"?"Someone":PEOPLE[viewingAs]||viewingAs;if(!S.activity)S.activity=[];S.activity.unshift({who,action,section,detail,ts:new Date().toISOString()});if(S.activity.length>100)S.activity=S.activity.slice(0,100);}
 function showSync(type,msg){const el=document.getElementById("sync-status");el.textContent=msg;el.className="show "+type;clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove("show"),3000);}
 function renderAll(){renderTimeline();renderTasks();renderGuests(guestFilt);renderVendors();renderLocations();renderMoodboard(mbFilt);renderActivity(actFilt);updateCountdown();buildCals();}
