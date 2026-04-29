@@ -498,14 +498,20 @@ footer{background:var(--dark);padding:3.5rem 3rem 2rem;}
     <button class="fb" onclick="filterGuests('Europe',this)">Europe</button>
     <button class="fb" onclick="filterGuests('Local',this)">Local</button>
   </div>
-  <div class="tw"><table><thead><tr><th>Name</th><th>Side</th><th>Category</th><th>Origin</th><th>Events</th><th>Contact</th><th></th></tr></thead><tbody id="gtbody"><tr><td colspan="6" class="empty-state">No guests yet</td></tr></tbody></table></div>
+  <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;flex-wrap:wrap;">
+    <button class="btn-add" onclick="exportGuestsCSV()" style="height:32px;padding:0 0.85rem;font-size:0.7rem;background:var(--muted);">Export CSV</button>
+    <label class="btn-add" style="height:32px;padding:0 0.85rem;font-size:0.7rem;background:var(--pine);cursor:pointer;">Import CSV<input type="file" accept=".csv" style="display:none" onchange="importGuestsCSV(this)"></label>
+  </div>
+  <div class="tw"><table><thead><tr><th>Name</th><th>Side</th><th>Category</th><th>Origin</th><th>Events</th><th>Notes</th><th></th></tr></thead><tbody id="gtbody"><tr><td colspan="7" class="empty-state">No guests yet</td></tr></tbody></table></div>
   <div class="add-form">
     <div class="fg"><label>Name</label><input class="fi" id="gn" placeholder="e.g. Hassan Ali" onkeydown="if(event.key==='Enter')addGuest()"></div>
+    <div class="fg"><label>Side</label><select class="fi" id="gside"><option value="Zulfi">Zulfi</option><option value="Afshan">Afshan</option><option value="both">Both / Joint</option></select></div>
+    <div class="fg"><label>Category</label><select class="fi" id="gcat"><option>Friend</option><option>Relative</option><option>Work</option><option>Jamat Khana</option><option>sister's friend</option><option>Other</option></select></div>
+    <div class="fg"><label>Group / Label</label><input class="fi" id="ggroup" placeholder="e.g. NUST, School, Dubai..."></div>
     <div class="fg"><label>Origin</label><select class="fi" id="go"><option>Local</option><option>Europe</option><option>Middle East</option><option>Dubai</option><option>Travelling</option></select></div>
     <div class="fg"><label>Events</label><select class="fi" id="ge"><option value="All Events">All Events (Nikah + Mehendi + Walima)</option><option value="Nikah only">Nikah only</option><option value="Mehendi only">Mehendi only</option><option value="Walima only">Walima only</option><option value="Nikah + Walima">Nikah + Walima</option><option value="Mehendi + Walima">Mehendi + Walima</option></select></div>
-    <div class="fg"><label>Contact Person</label><select class="fi" id="gc"><option value="zulfi">Zulfi</option><option value="afshan">Afshan</option><option value="mehwish">Mehwish</option><option value="faizan">Faizan</option><option value="seher">Seher</option><option value="hira">Hira</option></select></div>
     <div class="fg"><label>Notes</label><input class="fi" id="gnotes" placeholder="Needs accommodation..."></div>
-    <button class="btn-add" onclick="addGuest()" style="align-self:end;height:36px;padding:0 1rem;">+ Add</button>
+    <button class="btn-add" onclick="addGuest()" style="align-self:end;height:36px;padding:0 1rem;">+ Add Guest</button>
   </div>
 </div>
 
@@ -662,13 +668,27 @@ function renderAll(){renderTimeline();renderTasks();renderGuests(guestFilt);rend
 function updateCountdown(){
   const target=new Date("2025-09-01T00:00:00"),now=new Date(),diff=target-now;
   const pad=n=>String(Math.max(0,n)).padStart(2,"0");
-  if(diff>0){const days=Math.floor(diff/86400000),hours=Math.floor((diff%86400000)/3600000),mins=Math.floor((diff%3600000)/60000),secs=Math.floor((diff%60000)/1000);document.getElementById("cd-days").textContent=pad(days);document.getElementById("cd-hours").textContent=pad(hours);document.getElementById("cd-mins").textContent=pad(mins);document.getElementById("cd-secs").textContent=pad(secs);}
-  ["nikah","mehendi","walima"].forEach((ev,i)=>{const dates=["2025-09-01","2025-09-04","2025-09-05"];const d=Math.ceil((new Date(dates[i])-now)/86400000);const el=document.getElementById("ev-cd-"+ev);if(el)el.textContent=d>0?d+" days away":d===0?"Today! 🎉":"";});
-  const ad=document.getElementById("about-days");if(ad)ad.textContent=Math.max(0,Math.ceil(diff/86400000));
+  if(diff>0){
+    const days=Math.floor(diff/86400000),hours=Math.floor((diff%86400000)/3600000),mins=Math.floor((diff%3600000)/60000),secs=Math.floor((diff%60000)/1000);
+    document.getElementById("cd-days").textContent=pad(days);
+    document.getElementById("cd-hours").textContent=pad(hours);
+    document.getElementById("cd-mins").textContent=pad(mins);
+    document.getElementById("cd-secs").textContent=pad(secs);
+  } else {
+    const sinceMs=Math.abs(diff),sinceD=Math.floor(sinceMs/86400000),sinceH=Math.floor((sinceMs%86400000)/3600000),sinceM=Math.floor((sinceMs%3600000)/60000),sinceS=Math.floor((sinceMs%60000)/1000);
+    document.getElementById("cd-days").textContent=pad(sinceD);
+    document.getElementById("cd-hours").textContent=pad(sinceH);
+    document.getElementById("cd-mins").textContent=pad(sinceM);
+    document.getElementById("cd-secs").textContent=pad(sinceS);
+    const cdLabel=document.querySelector(".countdown-bar .cd-label");
+    if(cdLabel&&cdLabel.textContent.startsWith("Time until"))cdLabel.textContent="Married — time since Nikah";
+  }
+  ["nikah","mehendi","walima"].forEach((ev,i)=>{const dates=["2025-09-01","2025-09-04","2025-09-05"];const d=Math.ceil((new Date(dates[i])-now)/86400000);const el=document.getElementById("ev-cd-"+ev);if(el)el.textContent=d>0?d+" days away":d===0?"Today! 🎉":"Celebrated ✓";});
+  const ad=document.getElementById("about-days");if(ad){const daysVal=Math.ceil(diff/86400000);ad.textContent=daysVal>0?daysVal:Math.abs(daysVal);const adLabel=document.querySelector("#about-days+.stat-label");if(adLabel)adLabel.textContent=diff>0?"Days to Go":"Days Since";}
 }
 updateCountdown();setInterval(updateCountdown,1000);
 
-function renderTimeline(){const evs=[{ev:"nikah",name:"Nikah",date:"1 September 2025",day:"Tuesday",loc:"Ayashi, Ghizer"},{ev:"mehendi",name:"Mehendi Bazam",date:"4 September 2025",day:"Friday",loc:"Duroyo Inn, Gilgit"},{ev:"walima",name:"Walima",date:"5 September 2025",day:"Saturday · Main Event",loc:"Gilgit · Venue TBC"}];const dates=["2025-09-01","2025-09-04","2025-09-05"];document.getElementById("tl-cards").innerHTML=evs.map((e,i)=>{const d=Math.ceil((new Date(dates[i])-new Date())/86400000);return `<div class="tl-card tl-${e.ev}"><div class="tl-name">${e.name}</div><div class="tl-date">${e.date}</div><div class="tl-day">${e.day}</div><div class="tl-loc">📍 ${e.loc}</div><div class="tl-cd">${d>0?d+" days away":d===0?"Today! 🎉":""}</div></div>`;}).join("");}
+function renderTimeline(){const evs=[{ev:"nikah",name:"Nikah",date:"1 September 2025",day:"Tuesday",loc:"Ayashi, Ghizer"},{ev:"mehendi",name:"Mehendi Bazam",date:"4 September 2025",day:"Friday",loc:"Duroyo Inn, Gilgit"},{ev:"walima",name:"Walima",date:"5 September 2025",day:"Saturday · Main Event",loc:"Gilgit · Venue TBC"}];const dates=["2025-09-01","2025-09-04","2025-09-05"];document.getElementById("tl-cards").innerHTML=evs.map((e,i)=>{const d=Math.ceil((new Date(dates[i])-new Date())/86400000);return `<div class="tl-card tl-${e.ev}"><div class="tl-name">${e.name}</div><div class="tl-date">${e.date}</div><div class="tl-day">${e.day}</div><div class="tl-loc">📍 ${e.loc}</div><div class="tl-cd">${d>0?d+" days away":d===0?"Today! 🎉":"Celebrated ✓"}</div></div>`;}).join("");}
 
 function buildCals(){buildCal("cal-aug",2025,7,[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23],[24],[25,26,27,28,29,30,31],{});buildCal("cal-sep",2025,8,[],[],[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30],{nikah:1,mehendi:4,walima:5});}
 function buildCal(id,year,month,restricted,arbaeen,window_,evDays){const el=document.getElementById(id);if(!el||el.children.length)return;["Su","Mo","Tu","We","Th","Fr","Sa"].forEach(d=>{const x=document.createElement("div");x.className="dl";x.textContent=d;el.appendChild(x);});const fd=new Date(year,month,1).getDay();for(let i=0;i<fd;i++){const x=document.createElement("div");x.className="cd-cell empty";x.textContent="·";el.appendChild(x);}const dim=new Date(year,month+1,0).getDate();for(let d=1;d<=dim;d++){const x=document.createElement("div");x.className="cd-cell";x.textContent=d;if(restricted.includes(d))x.classList.add("restricted");if(arbaeen.includes(d))x.classList.add("arbaeen");if(window_.includes(d))x.classList.add("window");if(evDays.nikah===d)x.classList.add("ev-nikah");if(evDays.mehendi===d)x.classList.add("ev-mehendi");if(evDays.walima===d)x.classList.add("ev-walima");x.onclick=()=>calClick(year,month,d,x);el.appendChild(x);}}
@@ -680,17 +700,26 @@ function removeTask(ev,i){logActivity("removed","Tasks",S.tasks[ev][i].text);S.t
 function addTask(ev){const inp=document.getElementById("ti-"+ev),owner=document.getElementById("to-"+ev).value;if(!inp.value.trim())return;S.tasks[ev].push({text:inp.value.trim(),owner,done:false});logActivity("added task","Tasks",inp.value.trim()+" → "+ev);inp.value="";renderTasks();push();}
 function filterTasks(owner,btn){document.querySelectorAll("#tab-events .fb").forEach(b=>b.classList.remove("active"));btn.classList.add("active");document.querySelectorAll(".ti").forEach(li=>{li.style.display=(owner==="all"||li.dataset.owner===owner)?"flex":"none";});}
 
-function addGuest(){const name=document.getElementById("gn").value.trim();if(!name)return;S.guests.push({name,origin:document.getElementById("go").value,events:document.getElementById("ge").value,contact:document.getElementById("gc").value,notes:document.getElementById("gnotes").value});logActivity("added guest","Guests",name);document.getElementById("gn").value="";document.getElementById("gnotes").value="";renderGuests(guestFilt);push();}
+function addGuest(){const name=document.getElementById("gn").value.trim();if(!name)return;S.guests.push({name,category:document.getElementById("gcat").value,side:document.getElementById("gside").value,group:document.getElementById("ggroup").value,origin:document.getElementById("go").value,events:document.getElementById("ge").value,notes:document.getElementById("gnotes").value});logActivity("added guest","Guests",name);document.getElementById("gn").value="";document.getElementById("gnotes").value="";document.getElementById("ggroup").value="";renderGuests(guestFilt);push();}
 function removeGuest(i){logActivity("removed guest","Guests",S.guests[i].name);S.guests.splice(i,1);renderGuests(guestFilt);push();}
 function renderGuests(filt){guestFilt=filt;const tbody=document.getElementById("gtbody");const list=filt==="all"?S.guests:S.guests.filter(g=>{
     if(filt==="Zulfi") return g.side&&g.side.toLowerCase()==="zulfi";
     if(filt==="Afshan") return g.side&&g.side.toLowerCase()==="afshan";
-    if(filt==="both") return g.side&&g.side.toLowerCase()==="both";
+    if(filt==="both") return g.side&&(g.side.toLowerCase()==="both"||g.side.toLowerCase()==="joint");
     if(filt==="Friend") return g.category&&g.category.toLowerCase().includes("friend");
     if(filt==="Relative") return g.category&&g.category.toLowerCase().includes("relative");
     return g.origin===filt||g.origin.includes(filt);
-  });tbody.innerHTML=list.length?list.map(g=>{const oc=g.origin==="Europe"?"o-eu":(g.origin==="Middle East"||g.origin==="Dubai")?"o-me":"o-pk";const ri=S.guests.indexOf(g);const cl=OC[g.contact]||"ob";const cl_l=PEOPLE[g.contact]||g.contact;return `<tr><td>${g.name}</td><td><span class="obadge ${oc}">${g.origin}</span></td><td>${g.events}</td><td><span class="otag ${cl}">${cl_l}</span></td><td>${g.notes||"—"}</td><td><button class="xbtn" onclick="removeGuest(${ri})">×</button></td></tr>`;}).join(""):"<tr><td colspan='6' class='empty-state'>No guests yet</td></tr>";document.getElementById("gs-total").textContent=S.guests.length;document.getElementById("gs-eu").textContent=S.guests.filter(g=>g.origin==="Europe").length;document.getElementById("gs-me").textContent=S.guests.filter(g=>g.origin==="Middle East"||g.origin==="Dubai").length;document.getElementById("gs-pk").textContent=S.guests.filter(g=>g.origin==="Local").length;}
+  });const sideColor={zulfi:"oz",afshan:"oa",both:"ob",joint:"ob"};
+  tbody.innerHTML=list.length?list.map(g=>{const ri=S.guests.indexOf(g);const sc=sideColor[(g.side||"").toLowerCase()]||"ob";const sl=g.side||"—";return `<tr><td>${g.name}${g.group?`<div style="font-size:0.68rem;color:var(--muted);margin-top:0.1rem;">${g.group}</div>`:""}</td><td><span class="otag ${sc}" style="font-size:0.65rem;">${sl}</span></td><td>${g.category||"—"}</td><td>${g.origin||"—"}</td><td>${g.events||"—"}</td><td>${g.notes||"—"}</td><td><button class="xbtn" onclick="removeGuest(${ri})">×</button></td></tr>`;}).join(""):"<tr><td colspan='7' class='empty-state'>No guests yet</td></tr>";
+  document.getElementById("gs-total").textContent=S.guests.length;
+  document.getElementById("gs-eu").textContent=S.guests.filter(g=>g.side&&g.side.toLowerCase()==="zulfi").length;
+  document.getElementById("gs-me").textContent=S.guests.filter(g=>g.side&&g.side.toLowerCase()==="afshan").length;
+  document.getElementById("gs-pk").textContent=S.guests.filter(g=>g.side&&(g.side.toLowerCase()==="both"||g.side.toLowerCase()==="joint")).length;
+  const fEl=document.getElementById("gs-friends");if(fEl)fEl.textContent=S.guests.filter(g=>g.category&&g.category.toLowerCase().includes("friend")).length;
+  const rEl=document.getElementById("gs-relatives");if(rEl)rEl.textContent=S.guests.filter(g=>g.category&&g.category.toLowerCase().includes("relative")).length;}
 function filterGuests(filt,btn){document.querySelectorAll("#tab-guests .fb").forEach(b=>b.classList.remove("active"));btn.classList.add("active");renderGuests(filt);}
+function exportGuestsCSV(){const header=["Name","Side","Category","Group","Origin","Events","Notes"];const rows=S.guests.map(g=>[g.name,g.side,g.category,g.group,g.origin,g.events,g.notes].map(v=>`"${(v||"").replace(/"/g,'""')}"`).join(","));const csv=[header.join(","),...rows].join("\n");const a=document.createElement("a");a.href="data:text/csv;charset=utf-8,"+encodeURIComponent(csv);a.download="guests.csv";a.click();}
+function importGuestsCSV(input){const file=input.files[0];if(!file)return;const reader=new FileReader();reader.onload=e=>{const lines=e.target.result.split(/\r?\n/).filter(l=>l.trim());if(lines.length<2)return;const header=lines[0].split(",").map(h=>h.replace(/^"|"$/g,"").trim().toLowerCase());const added=[];lines.slice(1).forEach(line=>{const vals=[];let cur="",inQ=false;for(const c of line){if(c==='"'&&!inQ){inQ=true;}else if(c==='"'&&inQ){inQ=false;}else if(c===","&&!inQ){vals.push(cur);cur="";}else cur+=c;}vals.push(cur);const obj={};header.forEach((h,i)=>obj[h]=(vals[i]||"").replace(/^"|"$/g,"").trim());if(obj.name){S.guests.push({name:obj.name,side:obj.side||"",category:obj.category||"Friend",group:obj.group||"",origin:obj.origin||"Local",events:obj.events||"All Events",notes:obj.notes||""});added.push(obj.name);}});logActivity("imported "+added.length+" guests","Guests","CSV import");renderGuests(guestFilt);push();input.value="";alert(added.length+" guests imported.");};reader.readAsText(file);}
 
 const BPF={nikah:["bn-i","bn-o","bn-a"],mehendi:["bm-i","bm-o","bm-a"],walima:["bw-i","bw-o","bw-a"]};
 function addBudget(ev){const [ii,oi,ai]=BPF[ev];const item=document.getElementById(ii).value.trim();if(!item)return;const owner=document.getElementById(oi).value,amount=parseInt(document.getElementById(ai).value)||0;S.budget[ev].push({item,owner,amount});logActivity("added budget","Budget",item+" PKR "+amount.toLocaleString()+" → "+ev);document.getElementById(ii).value="";document.getElementById(ai).value="";push();}
