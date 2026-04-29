@@ -650,17 +650,28 @@ try{
   db=firebase.database(app);
   db.ref("wedding").on("value",snap=>{
     const d=snap.val();
-    if(d){S.tasks=d.tasks||DEFAULT_TASKS;S.guests=d.guests?(Array.isArray(d.guests)?d.guests:Object.values(d.guests)):[];S.budget=d.budget||{nikah:[],mehendi:[],walima:[]};S.vendors=d.vendors?(Array.isArray(d.vendors)?d.vendors:Object.values(d.vendors)):DEFAULT_VENDORS;S.locations=d.locations?(Array.isArray(d.locations)?d.locations:Object.values(d.locations)):DEFAULT_LOCATIONS;S.moodboard=d.moodboard?(Array.isArray(d.moodboard)?d.moodboard:Object.values(d.moodboard)):DEFAULT_MB;S.activity=d.activity?(Array.isArray(d.activity)?d.activity:Object.values(d.activity)):[];S.dates=d.dates||S.dates;}
+    if(d){const gRaw=d.guests?(Array.isArray(d.guests)?d.guests:Object.values(d.guests)):[];S.tasks=d.tasks||DEFAULT_TASKS;S.guests=gRaw.length?gRaw:S.guests;S.budget=d.budget||{nikah:[],mehendi:[],walima:[]};S.vendors=d.vendors?(Array.isArray(d.vendors)?d.vendors:Object.values(d.vendors)):DEFAULT_VENDORS;S.locations=d.locations?(Array.isArray(d.locations)?d.locations:Object.values(d.locations)):DEFAULT_LOCATIONS;S.moodboard=d.moodboard?(Array.isArray(d.moodboard)?d.moodboard:Object.values(d.moodboard)):DEFAULT_MB;S.activity=d.activity?(Array.isArray(d.activity)?d.activity:Object.values(d.activity)):[];S.dates=d.dates||S.dates;}
     else push();
     renderAll();
     document.getElementById("fbdot").classList.add("live");
     document.getElementById("fblabel").textContent="Live sync ✓";
     showSync("connected","🔥 Firebase connected!");
   });
-  db.ref(".info/connected").on("value",snap=>{if(!snap.val()){document.getElementById("fbdot").classList.remove("live");document.getElementById("fblabel").textContent="Offline";showSync("offline","⚠ Offline");}});
+  db.ref(".info/connected").on("value",snap=>{
+    if(snap.val()){
+      document.getElementById("fbdot").classList.add("live");
+      document.getElementById("fblabel").textContent="Live sync ✓";
+      clearTimeout(window._offlineTimer);
+    } else {
+      document.getElementById("fbdot").classList.remove("live");
+      document.getElementById("fblabel").textContent="Connecting...";
+      clearTimeout(window._offlineTimer);
+      window._offlineTimer=setTimeout(()=>{document.getElementById("fblabel").textContent="Offline";showSync("offline","⚠ Offline — changes saved locally");},4000);
+    }
+  });
 }catch(e){console.warn(e);document.getElementById("fblabel").textContent="Offline mode";renderAll();}
 
-function push(){localStorage.setItem("za_data",JSON.stringify(S));if(!db){showSync("synced","✓ Saved locally");return;}showSync("syncing","⏳ Syncing...");db.ref("wedding").set({tasks:S.tasks,guests:S.guests,budget:S.budget,vendors:S.vendors,locations:S.locations,moodboard:S.moodboard,activity:S.activity,dates:S.dates}).then(()=>showSync("synced","✓ Saved & synced"));}
+function push(){localStorage.setItem("za_data",JSON.stringify(S));if(!db){showSync("synced","✓ Saved locally");return;}showSync("syncing","⏳ Syncing...");db.ref("wedding").set({tasks:S.tasks,guests:S.guests,budget:S.budget,vendors:S.vendors,locations:S.locations,moodboard:S.moodboard,activity:S.activity,dates:S.dates}).then(()=>showSync("synced","✓ Saved & synced")).catch(err=>{showSync("offline","✗ Sync failed — saved locally");console.error("Firebase write error:",err);});}
 function logActivity(action,section,detail){const who=viewingAs==="all"?"Someone":PEOPLE[viewingAs]||viewingAs;if(!S.activity)S.activity=[];S.activity.unshift({who,action,section,detail,ts:new Date().toISOString()});if(S.activity.length>100)S.activity=S.activity.slice(0,100);}
 function showSync(type,msg){const el=document.getElementById("sync-status");el.textContent=msg;el.className="show "+type;clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove("show"),3000);}
 function renderAll(){renderTimeline();renderTasks();renderGuests(guestFilt);renderVendors();renderLocations();renderMoodboard(mbFilt);renderActivity(actFilt);updateCountdown();buildCals();}
@@ -683,12 +694,12 @@ function updateCountdown(){
     const cdLabel=document.querySelector(".countdown-bar .cd-label");
     if(cdLabel&&cdLabel.textContent.startsWith("Time until"))cdLabel.textContent="Married — time since Nikah";
   }
-  ["nikah","mehendi","walima"].forEach((ev,i)=>{const dates=["2025-09-01","2025-09-04","2025-09-05"];const d=Math.ceil((new Date(dates[i])-now)/86400000);const el=document.getElementById("ev-cd-"+ev);if(el)el.textContent=d>0?d+" days away":d===0?"Today! 🎉":"Celebrated ✓";});
+  ["nikah","mehendi","walima"].forEach((ev,i)=>{const dates=["2025-09-01","2025-09-04","2025-09-05"];const d=Math.ceil((new Date(dates[i])-now)/86400000);const el=document.getElementById("ev-cd-"+ev);if(el)el.textContent=d>0?d+" days away":d===0?"Today! 🎉":"";});
   const ad=document.getElementById("about-days");if(ad){const daysVal=Math.ceil(diff/86400000);ad.textContent=daysVal>0?daysVal:Math.abs(daysVal);const adLabel=document.querySelector("#about-days+.stat-label");if(adLabel)adLabel.textContent=diff>0?"Days to Go":"Days Since";}
 }
 updateCountdown();setInterval(updateCountdown,1000);
 
-function renderTimeline(){const evs=[{ev:"nikah",name:"Nikah",date:"1 September 2025",day:"Tuesday",loc:"Ayashi, Ghizer"},{ev:"mehendi",name:"Mehendi Bazam",date:"4 September 2025",day:"Friday",loc:"Duroyo Inn, Gilgit"},{ev:"walima",name:"Walima",date:"5 September 2025",day:"Saturday · Main Event",loc:"Gilgit · Venue TBC"}];const dates=["2025-09-01","2025-09-04","2025-09-05"];document.getElementById("tl-cards").innerHTML=evs.map((e,i)=>{const d=Math.ceil((new Date(dates[i])-new Date())/86400000);return `<div class="tl-card tl-${e.ev}"><div class="tl-name">${e.name}</div><div class="tl-date">${e.date}</div><div class="tl-day">${e.day}</div><div class="tl-loc">📍 ${e.loc}</div><div class="tl-cd">${d>0?d+" days away":d===0?"Today! 🎉":"Celebrated ✓"}</div></div>`;}).join("");}
+function renderTimeline(){const evs=[{ev:"nikah",name:"Nikah",date:"1 September 2025",day:"Tuesday",loc:"Ayashi, Ghizer"},{ev:"mehendi",name:"Mehendi Bazam",date:"4 September 2025",day:"Friday",loc:"Duroyo Inn, Gilgit"},{ev:"walima",name:"Walima",date:"5 September 2025",day:"Saturday · Main Event",loc:"Gilgit · Venue TBC"}];const dates=["2025-09-01","2025-09-04","2025-09-05"];document.getElementById("tl-cards").innerHTML=evs.map((e,i)=>{const d=Math.ceil((new Date(dates[i])-new Date())/86400000);return `<div class="tl-card tl-${e.ev}"><div class="tl-name">${e.name}</div><div class="tl-date">${e.date}</div><div class="tl-day">${e.day}</div><div class="tl-loc">📍 ${e.loc}</div><div class="tl-cd">${d>0?d+" days away":d===0?"Today! 🎉":""}</div></div>`;}).join("");}
 
 function buildCals(){buildCal("cal-aug",2025,7,[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23],[24],[25,26,27,28,29,30,31],{});buildCal("cal-sep",2025,8,[],[],[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30],{nikah:1,mehendi:4,walima:5});}
 function buildCal(id,year,month,restricted,arbaeen,window_,evDays){const el=document.getElementById(id);if(!el||el.children.length)return;["Su","Mo","Tu","We","Th","Fr","Sa"].forEach(d=>{const x=document.createElement("div");x.className="dl";x.textContent=d;el.appendChild(x);});const fd=new Date(year,month,1).getDay();for(let i=0;i<fd;i++){const x=document.createElement("div");x.className="cd-cell empty";x.textContent="·";el.appendChild(x);}const dim=new Date(year,month+1,0).getDate();for(let d=1;d<=dim;d++){const x=document.createElement("div");x.className="cd-cell";x.textContent=d;if(restricted.includes(d))x.classList.add("restricted");if(arbaeen.includes(d))x.classList.add("arbaeen");if(window_.includes(d))x.classList.add("window");if(evDays.nikah===d)x.classList.add("ev-nikah");if(evDays.mehendi===d)x.classList.add("ev-mehendi");if(evDays.walima===d)x.classList.add("ev-walima");x.onclick=()=>calClick(year,month,d,x);el.appendChild(x);}}
